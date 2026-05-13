@@ -1,0 +1,22 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*/ajax/mercury/change_read_status*",
+      "initiatorDomains": ["www.messenger.com", "www.facebook.com"],
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": { "type": "block" },
+    "condition": {
+      "urlFilter": "*mark_read*",
+      "initiatorDomains": ["www.messenger.com", "www.facebook.com"],
+      "resourceTypes": ["xmlhttprequest"]
+    }
+  }
+]
