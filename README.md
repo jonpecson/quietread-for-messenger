@@ -2,7 +2,9 @@
 
 > Read with breathing room.
 
-A privacy-first Chrome extension that offers **best-effort, experimental** protection against Seen/read-receipt signals when reading conversations on Messenger Web (messenger.com and facebook.com/messages).
+A privacy-first Chrome extension that offers **best-effort, experimental** protection against Seen/read-receipt signals when reading conversations on Messenger Web.
+
+> **Recommended:** Use this extension on **[messenger.com](https://www.messenger.com)** for the best experience. The extension is tested and validated primarily on messenger.com. While facebook.com/messages is also supported, messenger.com provides the most reliable protection.
 
 ---
 
@@ -29,7 +31,7 @@ There is **no Chrome Web Store release** yet. Installation requires loading the 
 ## Features
 
 - Intercepts and blocks known Messenger read-receipt/Seen network requests using Chrome's `declarativeNetRequest` API (MV3)
-- Works on both `messenger.com` and `facebook.com/messages`
+- Works on **messenger.com** (recommended) and facebook.com/messages
 - Persistent on/off toggle via the toolbar popup
 - On-page status pill so you always know whether protection is active while browsing
 - Warning toast when protection is disabled and you open a conversation thread
@@ -70,7 +72,7 @@ Requires Node.js 20+ and npm.
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_ORG/quietread-for-messenger.git
+git clone https://github.com/jonpecson/quietread-for-messenger.git
 cd quietread-for-messenger
 
 # Install dependencies
@@ -148,9 +150,9 @@ Injected into Messenger pages at `document_idle`. Responsibilities:
 - Monitors conversation link clicks and shows a warning toast if protection is off (`thread-guard.ts`)
 - In debug mode, injects the fetch/XHR instrumentation hook into the page context and relays sanitized log entries to the background
 
-### Injected Debug Hook (`src/injected/fetch-xhr-hook.ts`)
+### Page-Level Interception Hook (`src/injected/fetch-xhr-hook.ts`)
 
-Runs in the **page context** (not the extension sandbox) to observe `fetch()` and `XMLHttpRequest` calls before they are made. It pattern-matches URLs against known read-receipt strings, sanitizes the URL (strips query parameters), and posts a message to the content script. It does not block requests — blocking is handled by DNR. The hook is only injected when debug mode is enabled.
+Runs in the **page context** (MAIN world, injected at `document_start`) to intercept read receipts at their source. Modern Messenger sends read receipts primarily through **MQTT over WebSocket** (`wss://edge-chat.messenger.com`), not as separate HTTP requests. The hook wraps `WebSocket.send()`, `fetch()`, and `XMLHttpRequest` to inspect outgoing data for read-receipt patterns and silently drops matching messages. This is the primary blocking mechanism — DNR rules serve as a secondary safety net for URL-matching requests.
 
 ### Popup (`src/popup/`) and Options (`src/options/`)
 
@@ -189,7 +191,7 @@ QuietRead will never:
 
 - **Best-effort only.** Facebook changes its internal GraphQL and Lightspeed APIs regularly. A blocking pattern that works today may stop working after a Facebook deployment. There is no way to guarantee that every read-receipt signal is suppressed.
 - **DNR blocks at the network layer, not the application layer.** If Facebook adds a new endpoint not covered by the current patterns, receipts may slip through until the rules are updated.
-- **WebSocket / SSE traffic is not blocked.** Some Messenger state may be delivered over persistent connections that DNR cannot target with the current rule types. Research into this is ongoing.
+- **WebSocket interception depends on early injection.** The hook must load before Messenger's scripts open the WebSocket connection. A hard refresh (`Ctrl+Shift+R` / `Cmd+Shift+R`) after installing or updating ensures the hook loads first.
 - **Mobile apps are unaffected.** This extension only applies to Messenger Web in Chrome (or Chromium-based browsers). It has no effect on the Messenger mobile app or Facebook app.
 - **Other browsers are not supported.** The extension targets Chrome/Chromium MV3. Firefox support is not planned at this time.
 - **The status pill may not render on all Messenger layouts.** Facebook's DOM structure changes; the pill's injection point may break with UI updates.
