@@ -15,12 +15,17 @@ function handleConversationClick(event: MouseEvent): void {
   const link = target.closest('a[href*="/t/"], a[href*="messages/t/"]');
   if (!link) return;
 
-  // Check current protection status
-  chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATUS }, (response) => {
-    if (response?.settings && !response.settings.protectionEnabled) {
-      showWarningToast();
-    }
-  });
+  try {
+    if (!chrome.runtime?.id) return;
+    chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATUS }, (response) => {
+      if (chrome.runtime.lastError) return;
+      if (response?.settings && !response.settings.protectionEnabled) {
+        showWarningToast();
+      }
+    });
+  } catch {
+    // Extension context invalidated after reload
+  }
 }
 
 function showWarningToast(): void {
