@@ -5,7 +5,6 @@ import { MESSAGE_TYPES } from '../shared/constants';
 import type { QuietReadSettings } from '../shared/types';
 
 const site = detectSite();
-let hookInjected = false;
 
 if (site) {
   init();
@@ -14,17 +13,16 @@ if (site) {
 function init(): void {
   console.log('[QuietRead] Content script active on:', site);
 
+  // The page hook (fetch-xhr-hook.js) is already injected at document_start
+  // via manifest content_scripts with world: "MAIN". We just need to relay
+  // settings state to it and listen for its observations.
+
   chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATUS }, (response) => {
     if (response?.settings) {
       const settings: QuietReadSettings = response.settings;
       if (settings.showStatusPill) {
         createStatusPill(settings.protectionEnabled);
       }
-      // Inject the page hook whenever protection OR debug is on
-      if (settings.protectionEnabled || settings.debugEnabled) {
-        injectPageHook();
-      }
-      // Relay current state to the injected hook
       relayStateToHook(settings);
     }
   });
@@ -37,13 +35,19 @@ function init(): void {
       } else {
         removeStatusPill();
       }
-      // Ensure hook is injected if needed
-      if (settings.protectionEnabled || settings.debugEnabled) {
-        injectPageHook();
-      }
-      // Relay updated state
       relayStateToHook(settings);
     }
+  });
+
+  // Listen for observations from the page hook (MAIN world -> ISOLATED world via postMessage)
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    if (event.data?.source !== 'quietread-hook') return;
+
+    chrome.runtime.sendMessage({
+      type: MESSAGE_TYPES.REQUEST_OBSERVED,
+      entry: event.data.entry,
+    });
   });
 
   initThreadGuard();
@@ -55,32 +59,4 @@ function relayStateToHook(settings: QuietReadSettings): void {
     protectionEnabled: settings.protectionEnabled,
     debugEnabled: settings.debugEnabled,
   }, '*');
-}
-
-function injectPageHook(): void {
-  if (hookInjected) return;
-  hookInjected = true;
-
-  try {
-    const script = document.createElement('script');
-    script.src = chrome.runtime.getURL('injected/fetch-xhr-hook.js');
-    script.type = 'module';
-    (document.head || document.documentElement).appendChild(script);
-    script.onload = () => script.remove();
-    console.log('[QuietRead] Page hook injected');
-  } catch (e) {
-    console.warn('[QuietRead] Failed to inject page hook:', e);
-    hookInjected = false;
-  }
-
-  // Listen for observations from the injected hook
-  window.addEventListener('message', (event) => {
-    if (event.source !== window) return;
-    if (event.data?.source !== 'quietread-hook') return;
-
-    chrome.runtime.sendMessage({
-      type: MESSAGE_TYPES.REQUEST_OBSERVED,
-      entry: event.data.entry,
-    });
-  });
 }

@@ -29,6 +29,15 @@
         "https://www.messenger.com/*",
         "https://www.facebook.com/messages/*"
       ],
+      "js": ["injected/fetch-xhr-hook.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.messenger.com/*",
+        "https://www.facebook.com/messages/*"
+      ],
       "js": ["content/messenger-content.js"],
       "run_at": "document_idle"
     }
