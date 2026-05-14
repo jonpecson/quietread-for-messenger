@@ -38,7 +38,7 @@
       "resources": ["injected/fetch-xhr-hook.js"],
       "matches": [
         "https://www.messenger.com/*",
-        "https://www.facebook.com/messages/*"
+        "https://www.facebook.com/*"
       ]
     }
   ],
