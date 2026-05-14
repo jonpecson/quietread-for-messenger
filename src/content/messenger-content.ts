@@ -11,22 +11,29 @@ if (site) {
 }
 
 /**
- * Safely send a message to the background service worker.
- * After extension reload/update, the old content script's chrome.runtime
- * context is invalidated. This wraps calls to avoid uncaught errors.
+ * Check if the extension context is still valid.
+ * After extension reload/update, chrome.runtime.id throws
+ * "Extension context invalidated" — optional chaining doesn't help
+ * because chrome.runtime is still an object (its .id getter throws).
  */
-function safeSendMessage(message: unknown, callback?: (response: unknown) => void): void {
+function isContextValid(): boolean {
   try {
-    if (!chrome.runtime?.id) return; // context already invalidated
+    return !!chrome.runtime.id;
+  } catch {
+    return false;
+  }
+}
+
+function safeSendMessage(message: unknown, callback?: (response: unknown) => void): void {
+  if (!isContextValid()) return;
+  try {
     chrome.runtime.sendMessage(message, (response) => {
-      if (chrome.runtime.lastError) {
-        // Extension was reloaded — silently ignore
-        return;
-      }
+      if (!isContextValid()) return;
+      if (chrome.runtime.lastError) return;
       callback?.(response);
     });
   } catch {
-    // Extension context invalidated — nothing to do
+    // context gone
   }
 }
 
@@ -43,22 +50,26 @@ function init(): void {
     }
   });
 
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message.type === MESSAGE_TYPES.STATUS_UPDATE) {
-      const settings: QuietReadSettings = message.settings;
-      if (settings.showStatusPill) {
-        updateStatusPill(settings.protectionEnabled);
-      } else {
-        removeStatusPill();
+  try {
+    chrome.runtime.onMessage.addListener((message) => {
+      if (!isContextValid()) return;
+      if (message.type === MESSAGE_TYPES.STATUS_UPDATE) {
+        const settings: QuietReadSettings = message.settings;
+        if (settings.showStatusPill) {
+          updateStatusPill(settings.protectionEnabled);
+        } else {
+          removeStatusPill();
+        }
+        relayStateToHook(settings);
       }
-      relayStateToHook(settings);
-    }
-  });
+    });
+  } catch {
+    // context gone at registration time
+  }
 
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
     if (event.data?.source !== 'quietread-hook') return;
-
     safeSendMessage({
       type: MESSAGE_TYPES.REQUEST_OBSERVED,
       entry: event.data.entry,

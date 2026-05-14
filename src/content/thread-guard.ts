@@ -16,15 +16,16 @@ function handleConversationClick(event: MouseEvent): void {
   if (!link) return;
 
   try {
-    if (!chrome.runtime?.id) return;
+    void chrome.runtime.id; // throws if context invalidated
     chrome.runtime.sendMessage({ type: MESSAGE_TYPES.GET_STATUS }, (response) => {
+      try { void chrome.runtime.id; } catch { return; }
       if (chrome.runtime.lastError) return;
       if (response?.settings && !response.settings.protectionEnabled) {
         showWarningToast();
       }
     });
   } catch {
-    // Extension context invalidated after reload
+    // Extension context invalidated
   }
 }
 
